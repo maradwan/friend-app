@@ -1,0 +1,17 @@
+server {
+  listen 80;
+  index index.html;
+  server_name app;
+    autoindex on;
+
+  access_log /var/log/nginx/app-access.log;
+  error_log /var/log/nginx/app-error.log notice;
+  fastcgi_buffers 256 4k;
+  root /var/www/app;
+    location / {
+      proxy_pass http://localhost:3838;
+      proxy_redirect off;
+      proxy_set_header Host $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}

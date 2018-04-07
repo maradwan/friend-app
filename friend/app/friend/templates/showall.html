@@ -1,0 +1,46 @@
+{% extends "layout.html" %}
+ 
+{% block content %}
+  <h2>Friends List</h2>
+      <table>
+         <thead>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/table.css') }}">
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Better Check Boxes with jQuery and CSS | Tutorialzine Demo</title>
+
+<link rel="stylesheet" type="text/css" href="css/styles.css" />
+<link rel="stylesheet" type="text/css" href="jquery.tzCheckbox/jquery.tzCheckbox.css" />
+
+<table data-order='[[ 1, "asc" ]]' data-page-length='25'>
+    <thead>
+          <body>
+             <tr>
+               <th>First Name <span class="glyphicon glyphicon-user"></span>
+               <th>Last Name</th>
+               <th>Email <span class="glyphicon glyphicon-envelope"></span></th>
+               <th>Phone Number <span class="glyphicon glyphicon-phone"></span></th>
+            </tr>
+         </thead>
+
+         <tbody>
+            {% for friend in friends %}
+               <tr>
+                  <td>{{ friend.f_firstname }}</td>
+                  <td>{{ friend.f_lastname }}</td>
+                  <td>{{ friend.f_email }}</td>
+                  <td>{{ friend.f_phone }}</td>
+               </tr>
+            {% endfor %}
+         </tbody>
+      </table>
+<button type="button" class="btn btn-success">Enable</button>
+<button type="button" class="btn btn-warning">Disable</button>
+<button type="button" class="btn btn-danger">Delete</button>
+     
+{% endblock %}
+
+

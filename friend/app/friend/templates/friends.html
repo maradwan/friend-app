@@ -1,0 +1,41 @@
+
+{% extends "layout.html" %}
+ 
+{% block content %}
+  <h2>Friends Add</h2>
+ 
+  {% for message in form.f_firstname.errors %}
+    <div class="flash">{{ message }}</div>
+  {% endfor %}
+   
+  {% for message in form.f_lastname.errors %}
+    <div class="flash">{{ message }}</div>
+  {% endfor %}
+   
+  {% for message in form.f_email.errors %}
+    <div class="flash">{{ message }}</div>
+  {% endfor %}
+   
+  {% for message in form.f_phone.errors %}
+    <div class="flash">{{ message }}</div>
+  {% endfor %}
+   
+  <form action="{{ url_for('friends') }}" method=post>
+    {{ form.hidden_tag() }}
+     
+    {{ form.f_firstname.label }}
+    {{ form.f_firstname }}
+     
+    {{ form.f_lastname.label }}
+    {{ form.f_lastname }}
+     
+    {{ form.f_email.label }}
+    {{ form.f_email }}
+    
+    {{ form.f_phone.label }}
+    {{ form.f_phone }}
+     
+    {{ form.submit }}
+  </form>
+     
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+{% block content %}
+{%- for category, message in get_flashed_messages(with_categories = true) %}
+         <div class = "alert alert-success">
+            {{ message }}
+         </div>
+      {%- endfor %}
+
+  <div class="jumbo">
+    <h2>Profile<h2>
+        <h3>Welcome {{ session['email'] }}'s profile page<h3>
+        <h3> <li role="presentation" class="active"><a href="{{ url_for('delete') }}">Delete your Account</a></li></h3>
+
+
+  </div>
+{% endblock %}

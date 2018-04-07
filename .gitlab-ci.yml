@@ -1,0 +1,118 @@
+---
+
+image: ubuntu:latest
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  TERRAFORM_VER: '0.10.6'
+  PACKER_VER: '1.0.4'
+
+stages:
+  - build
+  - test
+  - test-deploy
+  - deploy
+  - clean-ami
+
+before_script:
+    - 'apt-get update -qq && apt-get install -qq -y openssh-client git curl unzip > /dev/null'
+    - echo -e "\n" | ssh-keygen -N "" &> /dev/null
+    - 'mkdir downloads && cd downloads'
+    - 'curl -s -O https://releases.hashicorp.com/terraform/${TERRAFORM_VER}/terraform_${TERRAFORM_VER}_linux_amd64.zip'
+    - 'curl -s -O https://releases.hashicorp.com/packer/${PACKER_VER}/packer_${PACKER_VER}_linux_amd64.zip'
+    - echo "Installing Packer and Terraform"
+    - 'unzip packer_${PACKER_VER}_linux_amd64.zip && mv packer /usr/local/bin/'
+    - 'unzip terraform_${TERRAFORM_VER}_linux_amd64.zip && mv terraform /usr/local/bin/'
+
+build ami:
+  stage: build
+  script:
+    - echo "Run Packer"
+    - cd $CI_PROJECT_DIR/packer
+    - 'packer validate app.json'
+    - 'packer build app.json'
+  allow_failure: false
+  artifacts:
+    paths:
+      - manifest_app.json
+    expire_in: '1 day'
+
+test ami:
+  stage: test
+  script:
+    - echo "Run Packer Tests"
+    - cd $CI_PROJECT_DIR
+    - 'echo { \"source_ami\": \"`egrep -m1 -oe "ami-.{8}" manifest_app.json`\"} > source_ami.json'
+    - cat source_ami.json
+    - cd $CI_PROJECT_DIR/packer-tests
+    - packer validate -var-file=$CI_PROJECT_DIR/source_ami.json app_tests.json
+    - packer build -var-file=$CI_PROJECT_DIR/source_ami.json app_tests.json
+  dependencies:
+  - build ami
+  artifacts:
+    paths:
+      - manifest_app_tested.json
+    expire_in: '30 day'
+
+deploy APP on staging:
+  stage: deploy
+  script:
+    - echo "Do your deploy here"
+    - cd $CI_PROJECT_DIR
+    - cat manifest_app_tested.json
+  dependencies:
+    - test ami
+
+test deploy APP on prod:
+  stage: test-deploy
+  script:
+    - export "region=eu-west-1"
+    - echo "Do your deploy here"
+    - cd $CI_PROJECT_DIR
+    - cat manifest_app_tested.json
+    - export "ami_id=$(egrep -m2 -oe $region:ami-.{8} manifest_app_tested.json | egrep -m2 -oe 'ami-.{8}')"
+    - export AWS_ACCESS_KEY_ID=$aws_access_key && export AWS_SECRET_ACCESS_KEY=$aws_secret_key
+    - cd $CI_PROJECT_DIR/terraform
+    - terraform init -backend-config="bucket=terraform-state-apps" -backend-config="key=production/$region/terraform.tfstate" -backend-config="region=eu-west-1" -backend-config="access_key=$AWS_ACCESS_KEY_ID" -backend-config="secret_key=$AWS_SECRET_ACCESS_KEY" -backend=true -force-copy -get=true -input=false
+    - terraform refresh -var "access_key=$AWS_ACCESS_KEY_ID" -var "secret_key=$AWS_SECRET_ACCESS_KEY" -var "region=$region"
+    - export "desired_capacity=$(terraform show | grep 'desired_capacity' | sed 's/[^0-9]*//g')"
+    - export "min_size=$(terraform show | grep 'min_size' | sed 's/[^0-9]*//g')"
+    - if [ -z "$min_size" ]; then export min_size=3;fi
+    - if [ -z "$desired_capacity" ]; then export desired_capacity=$min_size;fi
+    - if [ $min_size -ge $desired_capacity ]; then export desired_capacity=$min_size;fi
+    - terraform plan -var "access_key=$AWS_ACCESS_KEY_ID" -var "secret_key=$AWS_SECRET_ACCESS_KEY" -var "image_id=$ami_id" -var "region=$region" -var "desired_capacity=$desired_capacity"
+  dependencies:
+    - test ami
+
+deploy APP on prod:
+  stage: deploy
+  script:
+    - export "region=eu-west-1"
+    - cd $CI_PROJECT_DIR
+    - cat manifest_app_tested.json
+    - export "ami_id=$(egrep -m2 -oe $region:ami-.{8} manifest_app_tested.json | egrep -m2 -oe 'ami-.{8}')"
+    - export AWS_ACCESS_KEY_ID=$aws_access_key && export AWS_SECRET_ACCESS_KEY=$aws_secret_key
+    - cd $CI_PROJECT_DIR/terraform
+    - terraform init -backend-config="bucket=terraform-state-apps" -backend-config="key=production/$region/terraform.tfstate" -backend-config="region=eu-west-1" -backend-config="access_key=$AWS_ACCESS_KEY_ID" -backend-config="secret_key=$AWS_SECRET_ACCESS_KEY" -backend=true -force-copy -get=true -input=false
+    - terraform refresh -var "access_key=$AWS_ACCESS_KEY_ID" -var "secret_key=$AWS_SECRET_ACCESS_KEY" -var "region=$region"
+    - export "desired_capacity=$(terraform show | grep 'desired_capacity' | sed 's/[^0-9]*//g')"
+    - export "min_size=$(terraform show | grep 'min_size' | sed 's/[^0-9]*//g')"
+    - if [ -z "$min_size" ]; then export min_size=3;fi
+    - if [ -z "$desired_capacity" ]; then export desired_capacity=$min_size;fi
+    - if [ $min_size -ge $desired_capacity ]; then export desired_capacity=$min_size;fi
+    - terraform plan -var "access_key=$AWS_ACCESS_KEY_ID" -var "secret_key=$AWS_SECRET_ACCESS_KEY" -var "image_id=$ami_id" -var "region=$region" -var "desired_capacity=$desired_capacity"
+    - terraform apply -var "access_key=$AWS_ACCESS_KEY_ID" -var "secret_key=$AWS_SECRET_ACCESS_KEY" -var "image_id=$ami_id" -var "region=$region" -var "desired_capacity=$desired_capacity"
+    - 'curl -X POST --data-urlencode "payload={\"channel\": \"#prod-app\", \"username\": \"webhookbot\", \"text\": \"(Friend-APP) has been deployed \nAMI id $ami_id \nregion $region \nPipeline ID $CI_PIPELINE_ID \", \"icon_emoji\": \":ghost:\"}" https://hooks.slack.com/services/XXXXXXXXXXXX'
+  when: manual
+  dependencies:
+    - test ami
+
+Clean AMI:
+  stage: clean-ami
+  script:
+    - 'apt-get update -qq && apt-get install -qq -y python3-pip && pip3 install boto3'
+    - cd $CI_PROJECT_DIR/scripts
+    - 'python3 aws_clean_ami.py eu-west-1 friend-app 3'
+  when: manual
+  dependencies:
+    - deploy APP on prod

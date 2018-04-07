@@ -1,0 +1,66 @@
+{
+ 
+  "variables": {
+    "access_key": "{{ env `packer_access_key` }}",
+    "secret_key": "{{ env `packer_secret_key` }}",
+    "region": "eu-west-1",
+    "source_ami": "",
+    "instance_type": "t2.medium",
+    "vpc_id": "vpc-6c16dd0b",
+    "subnet_id": "subnet-d73ef6b0",
+    "ami_description": "Testing app by Packer",
+    "ci_pipeline_id": "{{ env `CI_PIPELINE_ID` }}",
+    "ami_regions": "eu-west-1"
+   },
+ 
+  "builders": [{
+    "type": "amazon-ebs",
+    "vpc_id":  "{{user `vpc_id`}}",
+    "subnet_id": "{{user `subnet_id`}}",
+    "access_key": "{{user `access_key`}}",
+    "secret_key": "{{user `secret_key`}}",
+    "region": "{{user `region`}}",
+    "launch_block_device_mappings": [
+    {
+      "device_name": "/dev/sda1",
+      "delete_on_termination": true,
+      "volume_size": 8,
+      "volume_type": "gp2"
+    }],
+    "source_ami": "{{user `source_ami`}}",
+    "instance_type": "{{user `instance_type`}}",
+    "ssh_username": "ubuntu",
+    "ami_name": "ami-app-{{isotime \"2006-01-02\"}}-{{uuid}}",
+    "ami_description": "{{user `ami_description`}}",
+    "ami_regions": ["{{user `ami_regions`}}"],
+    "tags": {
+        "ServerRole": "friend-app",
+        "Release": "Latest",
+        "CI_PIPELINE_ID": "{{user `ci_pipeline_id`}}",
+        "Runner": "Packer"
+      }
+  }],
+  "provisioners": [
+    {
+      "type": "file",
+       "source": "../spec-tests",
+      "destination": "/var/tmp/"
+    },  
+    {
+      "type": "shell",
+      "inline": "sudo salt-call --local state.highstate"
+    },
+    {
+      "type": "shell",
+      "inline": [ "cd /var/tmp/spec-tests/", "sudo gem install rake ", "sudo gem install net-ssh -v 2.9.4", " sudo gem install serverspec", "sudo rake spec TARGET_HOST=localhost" ]
+    }
+ ], 
+  "post-processors": [
+      {
+        "type": "manifest",
+        "output": "../manifest_app_tested.json",
+        "strip_path": true
+      }
+  ]
+} 
+
