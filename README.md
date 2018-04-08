@@ -9,3 +9,6 @@
 * [AWS ASG AMI]
 * [Blue-Green deployment]
 
+
+https://www.youtube.com/watch?v=ck-deAqxtA4&feature=youtu.be
+
