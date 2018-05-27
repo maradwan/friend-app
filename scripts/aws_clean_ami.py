@@ -27,7 +27,7 @@ def deregister_ami(serverrole,retention_days=90):
     old_snapshot_ami = []
     old_snapshot_id  = []
     for snapshot in ec2.snapshots.filter(Filters=filters):
-        r =re.findall(r'ami-.{8}', snapshot.description)
+        r =re.findall(r'ami-.{17}', snapshot.description)
         old_snapshot_ami.append(r)
         old_snapshot_id.append(snapshot.snapshot_id)
     for i in range(0,len(old_images)):
